@@ -1,21 +1,31 @@
-from abc import ABCMeta,abstractclassmethod
 
-class AbstractTask(metaclasss=ABCMeta):
-    """This Abstract class provides the basic structure of any 
-    BaseTask that performs an action in the workflow
-    """
-    
-    @abstractclassmethod
+from abc import ABCMeta
+from abc import abstractclassmethod
+from psycopg2 import connect
+
+
+class Task():
     def run(self):
-        raise NotImplementedError('The method called is abstract and must be implemented by BaseTask.')
+        return
     
-class BaseTask(AbstractTask):
-    """This is a concrete base class for an AbstractTask"""
-    
-    def run(self, *args, **kwargs) -> any:
-        """Executes python callable
+class createConnection(Task) :
+    def __init__(self):
+       self.run()
         
-        Returns:
-            Any:
-        """
-        return self.func(*args, **kwargs)
+    def run(**params):
+        connect(params)
+        
+class createTable(Task):
+    def __init__(self, dbName:str, tblName:str, creds:dict):
+        print("createTable() Not yet implemented")
+        return
+    
+class createSchema(Task):
+    def __init__(self):
+        print("createSchema() not yet implemented")
+        return
+
+class createWarehouse(Task):
+    def __init__(self):
+        print("createWarehouse() not yet implemented")
+        return
