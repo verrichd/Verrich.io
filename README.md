@@ -1,4 +1,4 @@
-# ![img](docs\static\verrich_io_logo.png)
+# ![img](docs/static/verrich_io_logo.png)
 
 ## __About Verrich.io__
 Verrich.io is a data processing tool that can be used to develop and execute an ETL Pipeline using a Directed Acyclic Graph (DAG) for topological sorting based on task dependencies.
