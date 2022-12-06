@@ -1,11 +1,8 @@
-from workflows import setup,extract,transform,load,teardown
+from samples.ETLworkflow import ETL
 
 def main(): 
-    setup()
-    extract()
-    transform()
-    load()
-    teardown()
+    ETL()
+   
 
 if __name__ == '__main__':
     main()

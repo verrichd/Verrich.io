@@ -1,12 +1,9 @@
 from configparser import ConfigParser
-from psycopg import Connection,connect,Cursor
-from psycopg.conninfo import make_conninfo
 import pandas as pd
 import numpy as np
+from sqlalchemy import create_engine
 
-
-
-def config_connect(path:str, section:str, **kwargs) -> Connection:
+def config_connect(path:str = '.config\database.ini', section:str = 'postgresql'):
     """_summary_ This function establishes a connection to a database given 
     credentials in a remote path in the project (typically config/database.ini)
 
@@ -33,12 +30,14 @@ def config_connect(path:str, section:str, **kwargs) -> Connection:
             # Parses each tuple in the list params to populate credentials dictionary
             credentials[k] = v  
     
-    # Creates connection using conninfo method from psycopg
-    conn = connect(conninfo=make_conninfo(**credentials),**kwargs)
+    # Creates connection using connection string and SQLAlchemy engine
+    conn_string = f"postgresql://{credentials['user']}:{credentials['password']}@{credentials['host']}:{credentials['port']}/{credentials['dbname']}"
+    engine = create_engine(conn_string)
+    conn = engine.connect()
     return conn
     
 
-def createSchema(conn:Connection,name:str):
+def createSchema(conn,name:str):
     """_summary_ This function creates a new schema for a database
     in an established connection using given name
 
@@ -48,14 +47,11 @@ def createSchema(conn:Connection,name:str):
     """
     # Builds the SQL command to create schema
     query = "CREATE SCHEMA IF NOT EXISTS " + name + ';'
-    # Uses given connection to create cursor object
-    cur = conn.cursor() 
-    # Cursor executes constructed query 
-    cur.execute(query) 
-     # Connection commits changes to update database
-    conn.commit()
+     
+    # Connection executes constructed query 
+    conn.execute(query) 
     
-def createTable(conn:Connection,schema:str,query:str):
+def createTable(conn,schema:str,query:str):
     """_summary_ Creates table in database schema (provided schema name exists)
 
     Args:
@@ -66,14 +62,12 @@ def createTable(conn:Connection,schema:str,query:str):
     # Frame provided query statement with CREATE TABLE command
     query = 'CREATE TABLE IF NOT EXISTS ' + schema + '.' + query
     query = query.replace('(schema)', schema, -1)
-    # Create cursor object using given connection
-    cur = conn.cursor()
-    # Cursor executes constructed query to create table
-    cur.execute(query)
-    # Connection commits to update database to show changes made
-    conn.commit()
     
-def extractData(conn:Connection,schema:str,tableName:str, columns:list[str]|str,**kwargs) -> pd.DataFrame:
+    # Connection executes constructed query to create table
+    conn.execute(query)
+   
+    
+def extractData(conn,schema:str,tableName:str, columns:list[str]|str) -> pd.DataFrame:
     """_summary_ This function collects information in specified columns
     from a table in the given schema
 
@@ -91,7 +85,7 @@ def extractData(conn:Connection,schema:str,tableName:str, columns:list[str]|str,
     df = pd.read_sql("SELECT " + columns + " FROM " + schema + '.' + tableName , conn)
     return df
 
-def loadData(conn:Connection, data:pd.DataFrame,schema:str,tblName:str):
+def loadData(conn, data:pd.DataFrame,schema:str,tblName:str):
     """_summary_ This function will load data from a data frame into a schema inside a 
     database provided a connection, schema, and table name
 
@@ -101,7 +95,7 @@ def loadData(conn:Connection, data:pd.DataFrame,schema:str,tblName:str):
         schema (str): _description_ name of the schema containing the table
         tblName (str): _description_ name of the table to be loaded with data
     """
-    data.to_sql(tblName,conn,schema,if_exists='replace')
+    data.to_sql(tblName,conn,schema = schema,if_exists='append',index=False)
 
 
 def formatDate(data:pd.DataFrame) -> pd.DataFrame:
@@ -117,7 +111,8 @@ def formatDate(data:pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: _description_ dataframe(sk_date,year,month,day,quarter)
     """
     newDF = dict()
-    newDF['sk_date'] = data['int_date']
+    newDF['sk_rental'] = data['rental_id']
+    newDF['date'] = data['int_date']
     newDF['year'] = list(data['year'])
     newDF['month'] = list(data['month'])
     newDF['day'] = list(data['day'])
@@ -142,6 +137,9 @@ def formatFilm(filmDF:pd.DataFrame,languageDF:pd.DataFrame) -> pd.DataFrame:
     language_dict = dict(zip(languageDF['language_id'],languageDF['name']))
     filmDF['language'] = filmDF['language_id'].map(language_dict)
     newDF = newDF.drop('language_id',axis=1)
+    newDF = newDF.rename(columns = {'film_id':'sk_film',
+                         'rating':'rating_code',
+                         'length':'film_duration'})
     return newDF
 
 def formatStore(store:pd.DataFrame,staff:pd.DataFrame,
@@ -209,8 +207,7 @@ def formatCustomer(customer:pd.DataFrame) -> pd.DataFrame:
     newDF = newDF.rename(columns={'customer_id':'sk_customer'})
     return newDF
     
-def formatFactRental(rental:pd.DataFrame,customer:pd.DataFrame,store:pd.DataFrame
-                     ,film:pd.DataFrame,staff:pd.DataFrame,inventory:pd.DataFrame) -> pd.DataFrame:
+def formatFactRental(rental:pd.DataFrame,inventory:pd.DataFrame) -> pd.DataFrame:
     """_summary_ Formats fact_rental table using rental dataframe as a template. Some column names
     are changed to match new schema, and more columns are added using the dictionary mapping method
     as seen in the functions that format the store and film dataframes.
@@ -224,17 +221,16 @@ def formatFactRental(rental:pd.DataFrame,customer:pd.DataFrame,store:pd.DataFram
         inventory (pd.DataFrame): _description_ inventory table extraction
 
     Returns:
-        pd.DataFrame: _description_ new dataframe(sk_customer,sk_date,
+        pd.DataFrame: _description_ new dataframe(sk_customer,sk_rental,
         sk_store,sk_film,sk_staff,count_rentals)
     """
     newDF = pd.DataFrame(rental)
-    newDF = newDF.rename(columns={'customer_id':'sk_customer','staff_id':'sk_staff','int_date':'sk_date'})
+    newDF = newDF.rename(columns={'customer_id':'sk_customer','staff_id':'sk_staff','rental_id':'sk_rental'})
     inv_to_store_dict = dict(zip(inventory['inventory_id'],inventory['store_id']))
     inv_to_film_dict = dict(zip(inventory['inventory_id'],inventory['film_id']))
     newDF['sk_store'] = newDF['inventory_id'].map(inv_to_store_dict)
     newDF['sk_film'] = newDF['inventory_id'].map(inv_to_film_dict)
-    newDF = newDF.drop(columns=['rental_date','inventory_id','day','year','month'])
-    #count_rentals = newDF.groupby(newDF['sk_film']).count()
-    #print(count_rentals)
+    newDF = newDF.groupby(['sk_customer', 'sk_rental', 'sk_store', 'sk_film', 'sk_staff']).agg(count_rentals=('sk_film','count')).reset_index()
+    
     return newDF
     

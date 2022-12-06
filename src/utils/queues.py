@@ -8,8 +8,8 @@ class QueueFactory:
         """Depending on type parameter, will return selected Queue"""
         
         if (type == 'default') : 
-            return Queue
+            return Queue()
         if (type == 'async') : 
-            return AsyncQueue
+            return AsyncQueue()
         if (type == 'multiprocessing') :
-            return Multiqueue
+            return Multiqueue()
