@@ -36,6 +36,14 @@ def config_connect(path:str = '.config\database.ini', section:str = 'postgresql'
     conn = engine.connect()
     return conn
     
+def teardown(conn):
+    """_summary_ Closes connection to database
+
+    Args:
+        conn (_type_): _description_ should be connection object
+        resulting from config_connect function
+    """
+    conn.close()
 
 def createSchema(conn,name:str):
     """_summary_ This function creates a new schema for a database

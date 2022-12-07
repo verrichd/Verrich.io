@@ -1,7 +1,7 @@
 from samples.ETLworkflow import ETL
 
 def main(): 
-    ETL()
+    ETL('public','dw')
    
 
 if __name__ == '__main__':
